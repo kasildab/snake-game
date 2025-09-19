@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Snake Game - Enhanced</title>
+  <link rel="icon" type="image/png" href="https://img.icons8.com/ios-filled/50/000000/snake.png"/>
   <style>
     html,
     body {
@@ -223,6 +224,8 @@
   </div>
 
   <script>
+    const eatSound = new Audio('https://freesound.org/data/previews/66/66717_931655-lq.mp3');
+    const gameOverSound = new Audio('https://freesound.org/data/previews/341/341695_5260874-lq.mp3');
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const scoreElement = document.getElementById('score');
@@ -300,27 +303,38 @@
       // Check collisions & eating
       let collision = false;
       snake.cells.forEach((cell, index) => {
-        if (cell.x === apple.x && cell.y === apple.y) {
-          snake.maxCells++;
-          scoreElement.textContent = parseInt(scoreElement.textContent) + 1;
-          // Animate score
-          scoreElement.style.transform = 'scale(1.3)';
-          setTimeout(() => scoreElement.style.transform = 'scale(1)', 100);
+  if (cell.x === apple.x && cell.y === apple.y) {
+    snake.maxCells++;
+    scoreElement.textContent = parseInt(scoreElement.textContent) + 1;
+    
+    // Animate score
+    scoreElement.style.transform = 'scale(1.3)';
+    setTimeout(() => scoreElement.style.transform = 'scale(1)', 100);
 
-          apple.x = getRandomInt(0, canvas.width / grid) * grid;
-          apple.y = getRandomInt(0, canvas.height / grid) * grid;
-        }
-        for (let i = index + 1; i < snake.cells.length; i++) {
-          if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) collision = true;
-        }
-      });
+    // Play eat sound
+    eatSound.currentTime = 0;
+    eatSound.play();
+
+    apple.x = getRandomInt(0, canvas.width / grid) * grid;
+    apple.y = getRandomInt(0, canvas.height / grid) * grid;
+  }
+  for (let i = index + 1; i < snake.cells.length; i++) {
+    if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) collision = true;
+  }
+});
+
       if (collision) gameOver();
     }
 
     function gameOver() {
       gameRunning = false;
-      finalScoreElement.textContent = scoreElement.textContent;
-      gameOverPopup.classList.add('show');
+  finalScoreElement.textContent = scoreElement.textContent;
+
+  // Play game over sound
+  gameOverSound.currentTime = 0;
+  gameOverSound.play();
+
+  gameOverPopup.classList.add('show');
     }
 
     startBtn.addEventListener('click', () => { if (!gameRunning) { gameRunning = true; loop(); } });
