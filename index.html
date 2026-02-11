@@ -243,9 +243,10 @@ canvas {
     const finalScoreElement = document.getElementById('finalScore');
 
     let grid;
+    let boardSize;
 
 function updateGrid() {
-  grid = Math.floor(canvas.width / 25 / (window.devicePixelRatio || 1));
+grid = Math.floor(boardSize / 25);
 }
 
     let count = 0;
@@ -256,7 +257,11 @@ function updateGrid() {
 
     function initGame() {
       snake = { x: 160, y: 160, dx: grid, dy: 0, cells: [], maxCells: 4 };
-      apple = { x: getRandomInt(0, canvas.width / grid) * grid, y: getRandomInt(0, canvas.height / grid) * grid };
+      apple = {
+  x: getRandomInt(0, boardSize / grid) * grid,
+  y: getRandomInt(0, boardSize / grid) * grid
+};
+
       scoreElement.textContent = 0;
       nextDirection = null;
       gameOverPopup.classList.remove('show');
@@ -269,15 +274,23 @@ function resizeCanvas() {
   const size = Math.min(window.innerWidth, window.innerHeight) * 0.85;
   const dpr = window.devicePixelRatio || 1;
 
+  // visible size (game logic uses this)
+  boardSize = size;
+
   canvas.style.width = size + "px";
   canvas.style.height = size + "px";
+game uses boardSize = 400 (visible area)
+canvas pixels used only for sharp rendering
 
+  // real pixel size (for sharp rendering)
   canvas.width = size * dpr;
   canvas.height = size * dpr;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    updateGrid();
+
+  updateGrid();
 }
+
 
 // run on load + resize
 window.addEventListener("resize", () => {
@@ -309,10 +322,11 @@ window.addEventListener("resize", () => {
       snake.x += snake.dx;
       snake.y += snake.dy;
 
-      if (snake.x < 0) snake.x = canvas.width - grid;
-      if (snake.x >= canvas.width) snake.x = 0;
-      if (snake.y < 0) snake.y = canvas.height - grid;
-      if (snake.y >= canvas.height) snake.y = 0;
+      if (snake.x < 0) snake.x = boardSize - grid;
+      if (snake.x >= boardSize) snake.x = 0;
+      if (snake.y < 0) snake.y = boardSize - grid;
+      if (snake.y >= boardSize) snake.y = 0;
+
 
       snake.cells.unshift({ x: snake.x, y: snake.y });
       if (snake.cells.length > snake.maxCells) snake.cells.pop();
@@ -348,8 +362,9 @@ window.addEventListener("resize", () => {
     eatSound.currentTime = 0;
     eatSound.play();
 
-    apple.x = getRandomInt(0, canvas.width / grid) * grid;
-    apple.y = getRandomInt(0, canvas.height / grid) * grid;
+    apple.x = getRandomInt(0, boardSize / grid) * grid;
+    apple.y = getRandomInt(0, boardSize / grid) * grid;
+
   }
   for (let i = index + 1; i < snake.cells.length; i++) {
     if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) collision = true;
