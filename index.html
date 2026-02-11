@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Snake Game</title>
+
 <style>
 html, body {
   margin: 0;
@@ -56,53 +57,34 @@ canvas {
   box-shadow: 0 0 20px rgba(126,252,109,0.6);
 }
 
-/* Portrait simple controls */
-.mobile-controls.portrait {
+.mobile-controls {
   display: none;
+  margin-top: 15px;
   flex-direction: column;
   align-items: center;
   gap: 10px;
 }
-.mobile-controls.portrait .row {
+
+.mobile-controls .row {
   display: flex;
   gap: 10px;
-  justify-content: center;
-}
-
-/* Landscape PlayStation-style controls */
-.mobile-controls.landscape {
-  display: none;
-  width: 90vw;
-  max-width: 600px;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.mobile-controls.landscape .dpad {
-  display: grid;
-  grid-template-columns: 50px 50px 50px;
-  grid-template-rows: 50px 50px 50px;
-  gap: 5px;
-}
-
-.mobile-controls.landscape .actions {
-  display: grid;
-  grid-template-columns: repeat(2, 50px);
-  grid-template-rows: repeat(2, 50px);
-  gap: 5px;
 }
 
 .mobile-btn {
-  padding: 15px;
-  font-size: 20px;
-  border-radius: 50%;
+  padding: 15px 20px;
+  font-size: 22px;
+  border-radius: 10px;
   border: none;
   background: #4a6cf7;
   color: white;
 }
+
+@media (max-width: 768px) {
+  .mobile-controls { display: flex; }
+}
 </style>
 </head>
+
 <body>
 
 <div class="top-bar">
@@ -114,8 +96,7 @@ canvas {
 
 <canvas id="game"></canvas>
 
-<!-- Portrait mobile controls -->
-<div class="mobile-controls portrait">
+<div class="mobile-controls">
   <div class="row">
     <button class="mobile-btn" data-dir="Up">↑</button>
   </div>
@@ -126,31 +107,15 @@ canvas {
   </div>
 </div>
 
-<!-- Landscape PlayStation-style mobile controls -->
-<div class="mobile-controls landscape">
-  <div class="dpad">
-    <div></div><button class="mobile-btn" data-dir="Up">↑</button><div></div>
-    <button class="mobile-btn" data-dir="Left">←</button><div></div><button class="mobile-btn" data-dir="Right">→</button>
-    <div></div><button class="mobile-btn" data-dir="Down">↓</button><div></div>
-  </div>
-  <div class="actions">
-    <button class="mobile-btn" data-dir="Up">△</button>
-    <button class="mobile-btn" data-dir="Right">○</button>
-    <button class="mobile-btn" data-dir="Left">□</button>
-    <button class="mobile-btn" data-dir="Down">✕</button>
-  </div>
-</div>
-
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+
 const scoreEl = document.getElementById("score");
 const startBtn = document.getElementById("startBtn");
 const pauseBtn = document.getElementById("pauseBtn");
 const resetBtn = document.getElementById("resetBtn");
 
-const portraitControls = document.querySelector(".mobile-controls.portrait");
-const landscapeControls = document.querySelector(".mobile-controls.landscape");
 const mobileBtns = document.querySelectorAll(".mobile-btn");
 
 let grid = 20;
@@ -158,117 +123,139 @@ let count = 0;
 let snake, apple;
 let nextDirection = null;
 let gameRunning = false;
-
+let animationId;
 function resizeCanvas() {
   const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.7);
   canvas.width = size;
   canvas.height = size;
 }
-window.addEventListener("resize", () => { resizeCanvas(); updateControls(); });
+window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
-function isMobile() {
-  return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-}
-
-function updateControls() {
-  if (!isMobile()) {
-    portraitControls.style.display = 'none';
-    landscapeControls.style.display = 'none';
-    return;
-  }
-
-  if (window.innerWidth > window.innerHeight) {
-    // landscape mobile
-    portraitControls.style.display = 'none';
-    landscapeControls.style.display = 'flex';
-  } else {
-    // portrait mobile
-    portraitControls.style.display = 'flex';
-    landscapeControls.style.display = 'none';
-  }
-}
-window.addEventListener("resize", updateControls);
-window.addEventListener("orientationchange", updateControls);
-updateControls();
-
 function initGame() {
-  snake = { x: grid*5, y: grid*5, dx: grid, dy: 0, cells: [], maxCells: 4 };
+  snake = {
+    x: grid * 5,
+    y: grid * 5,
+    dx: grid,
+    dy: 0,
+    cells: [],
+    maxCells: 4
+  };
+
   scoreEl.textContent = 0;
   nextDirection = null;
   placeApple();
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-function getRandomInt(min,max){ return Math.floor(Math.random()*(max-min))+min; }
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
 
-function placeApple(){
-  let valid=false;
-  while(!valid){
-    apple={ x: getRandomInt(0,Math.floor(canvas.width/grid))*grid,
-            y: getRandomInt(0,Math.floor(canvas.height/grid))*grid };
-    valid=!snake.cells.some(c=>c.x===apple.x && c.y===apple.y);
+// PLACE APPLE (never inside snake)
+function placeApple() {
+  let valid = false;
+  while (!valid) {
+    apple = {
+      x: getRandomInt(0, canvas.width / grid) * grid,
+      y: getRandomInt(0, canvas.height / grid) * grid
+    };
+
+    valid = !snake.cells.some(cell =>
+      cell.x === apple.x && cell.y === apple.y
+    );
   }
 }
 
-function loop(){
-  if(!gameRunning) return;
-  requestAnimationFrame(loop);
-  if(++count<5) return; count=0;
+function loop() {
+  if (!gameRunning) return;
 
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  animationId = requestAnimationFrame(loop);
 
-  if(nextDirection){
-    if(nextDirection==="Up" && snake.dy===0){snake.dy=-grid; snake.dx=0;}
-    if(nextDirection==="Down" && snake.dy===0){snake.dy=grid; snake.dx=0;}
-    if(nextDirection==="Left" && snake.dx===0){snake.dx=-grid; snake.dy=0;}
-    if(nextDirection==="Right" && snake.dx===0){snake.dx=grid; snake.dy=0;}
-    nextDirection=null;
-  }
+  if (++count < 5) return;
+  count = 0;
 
-  snake.x+=snake.dx;
-  snake.y+=snake.dy;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if(snake.x<0) snake.x=canvas.width-grid;
-  if(snake.x>=canvas.width) snake.x=0;
-  if(snake.y<0) snake.y=canvas.height-grid;
-  if(snake.y>=canvas.height) snake.y=0;
-
-  snake.cells.unshift({x:snake.x, y:snake.y});
-  if(snake.cells.length>snake.maxCells) snake.cells.pop();
-
-  ctx.fillStyle="red";
-  ctx.fillRect(apple.x,apple.y,grid-1,grid-1);
-
-  ctx.fillStyle="#7efc6d";
-  snake.cells.forEach((cell,index)=>{
-    ctx.fillRect(cell.x,cell.y,grid-1,grid-1);
-    for(let i=index+1;i<snake.cells.length;i++){
-      if(cell.x===snake.cells[i].x && cell.y===snake.cells[i].y) gameRunning=false;
+  if (nextDirection) {
+    if (nextDirection === "Up" && snake.dy === 0) {
+      snake.dy = -grid; snake.dx = 0;
     }
-    if(cell.x===apple.x && cell.y===apple.y){
+    if (nextDirection === "Down" && snake.dy === 0) {
+      snake.dy = grid; snake.dx = 0;
+    }
+    if (nextDirection === "Left" && snake.dx === 0) {
+      snake.dx = -grid; snake.dy = 0;
+    }
+    if (nextDirection === "Right" && snake.dx === 0) {
+      snake.dx = grid; snake.dy = 0;
+    }
+    nextDirection = null;
+  }
+
+  snake.x += snake.dx;
+  snake.y += snake.dy;
+
+  if (snake.x < 0) snake.x = canvas.width - grid;
+  if (snake.x >= canvas.width) snake.x = 0;
+  if (snake.y < 0) snake.y = canvas.height - grid;
+  if (snake.y >= canvas.height) snake.y = 0;
+
+  snake.cells.unshift({ x: snake.x, y: snake.y });
+
+  if (snake.cells.length > snake.maxCells) {
+    snake.cells.pop();
+  }
+
+  ctx.fillStyle = "red";
+  ctx.fillRect(apple.x, apple.y, grid - 1, grid - 1);
+
+  ctx.fillStyle = "#7efc6d";
+  snake.cells.forEach((cell, index) => {
+    ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+
+    for (let i = index + 1; i < snake.cells.length; i++) {
+      if (cell.x === snake.cells[i].x &&
+          cell.y === snake.cells[i].y) {
+        gameRunning = false;
+      }
+    }
+
+    if (cell.x === apple.x && cell.y === apple.y) {
       snake.maxCells++;
-      scoreEl.textContent=parseInt(scoreEl.textContent)+1;
+      scoreEl.textContent = parseInt(scoreEl.textContent) + 1;
       placeApple();
     }
   });
 }
 
-// Controls
-startBtn.onclick=()=>{if(!gameRunning){gameRunning=true; loop();}};
-pauseBtn.onclick=()=>gameRunning=false;
-resetBtn.onclick=()=>{gameRunning=false; initGame();};
+startBtn.onclick = () => {
+  if (!gameRunning) {
+    gameRunning = true;
+    loop();
+  }
+};
 
-document.addEventListener("keydown", e=>{
-  if(e.key==="ArrowUp") nextDirection="Up";
-  if(e.key==="ArrowDown") nextDirection="Down";
-  if(e.key==="ArrowLeft") nextDirection="Left";
-  if(e.key==="ArrowRight") nextDirection="Right";
+pauseBtn.onclick = () => gameRunning = false;
+
+resetBtn.onclick = () => {
+  gameRunning = false;
+  initGame();
+};
+
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowUp") nextDirection = "Up";
+  if (e.key === "ArrowDown") nextDirection = "Down";
+  if (e.key === "ArrowLeft") nextDirection = "Left";
+  if (e.key === "ArrowRight") nextDirection = "Right";
 });
 
-mobileBtns.forEach(btn=>{btn.onclick=()=>nextDirection=btn.dataset.dir;});
+mobileBtns.forEach(btn => {
+  btn.onclick = () => nextDirection = btn.dataset.dir;
+});
 
 initGame();
 </script>
+
 </body>
 </html>
