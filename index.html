@@ -14,102 +14,92 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  min-height: 100vh;
 }
 
 .top-bar {
+  margin-top: 15px;
   display: flex;
   gap: 15px;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  margin: 10px 0;
 }
 
 .score {
-  font-size: 5vw;
+  font-size: 22px;
   font-weight: bold;
   color: #7efc6d;
 }
 
 button {
+  padding: 10px 18px;
+  font-size: 16px;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
   font-weight: bold;
 }
 
-/* Canvas */
+.start { background: #4caf50; }
+.pause { background: #f0a500; }
+.reset { background: #e53935; }
+
 canvas {
+  width: min(90vw, 90vh);
+  height: min(90vw, 90vh);
+  max-width: 500px;
+  max-height: 500px;
   background: #081020;
   border: 3px solid #7efc6d;
   border-radius: 15px;
+  margin-top: 20px;
   box-shadow: 0 0 20px rgba(126,252,109,0.6);
-  margin: 10px 0;
-  width: 90vw;
-  height: 90vw;
-  max-width: 600px;
-  max-height: 600px;
 }
 
-/* Mobile Controls */
-.mobile-controls {
+/* Portrait simple controls */
+.mobile-controls.portrait {
   display: none;
-  margin-top: 10px;
-  width: 90vw;
-  max-width: 600px;
-  justify-content: space-between;
-}
-
-/* Portrait simple arrows */
-.portrait .mobile-controls {
-  display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
 }
-.portrait .row {
+.mobile-controls.portrait .row {
   display: flex;
   gap: 10px;
   justify-content: center;
 }
-.mobile-btn {
-  padding: 12px 18px;
-  font-size: 6vw;
-  border-radius: 50%;
-  background: #4a6cf7;
-  color: white;
-}
 
-/* Landscape: PlayStation-style controller */
-.landscape .mobile-controls {
-  display: flex;
+/* Landscape PlayStation-style controls */
+.mobile-controls.landscape {
+  display: none;
+  width: 90vw;
+  max-width: 600px;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
 }
-.landscape .dpad {
+
+.mobile-controls.landscape .dpad {
   display: grid;
   grid-template-columns: 50px 50px 50px;
   grid-template-rows: 50px 50px 50px;
   gap: 5px;
 }
-.landscape .dpad button {
-  width: 50px;
-  height: 50px;
-  font-size: 18px;
-}
-.landscape .actions {
+
+.mobile-controls.landscape .actions {
   display: grid;
   grid-template-columns: repeat(2, 50px);
   grid-template-rows: repeat(2, 50px);
   gap: 5px;
 }
-.landscape .actions button {
-  width: 50px;
-  height: 50px;
-  font-size: 18px;
+
+.mobile-btn {
+  padding: 15px;
+  font-size: 20px;
   border-radius: 50%;
+  border: none;
+  background: #4a6cf7;
+  color: white;
 }
 </style>
 </head>
@@ -124,6 +114,7 @@ canvas {
 
 <canvas id="game"></canvas>
 
+<!-- Portrait mobile controls -->
 <div class="mobile-controls portrait">
   <div class="row">
     <button class="mobile-btn" data-dir="Up">↑</button>
@@ -135,6 +126,7 @@ canvas {
   </div>
 </div>
 
+<!-- Landscape PlayStation-style mobile controls -->
 <div class="mobile-controls landscape">
   <div class="dpad">
     <div></div><button class="mobile-btn" data-dir="Up">↑</button><div></div>
@@ -156,39 +148,52 @@ const scoreEl = document.getElementById("score");
 const startBtn = document.getElementById("startBtn");
 const pauseBtn = document.getElementById("pauseBtn");
 const resetBtn = document.getElementById("resetBtn");
-const portraitControls = document.querySelector(".portrait");
-const landscapeControls = document.querySelector(".landscape");
+
+const portraitControls = document.querySelector(".mobile-controls.portrait");
+const landscapeControls = document.querySelector(".mobile-controls.landscape");
 const mobileBtns = document.querySelectorAll(".mobile-btn");
 
-let grid, count = 0, snake, apple;
+let grid = 20;
+let count = 0;
+let snake, apple;
 let nextDirection = null;
 let gameRunning = false;
-let animationId;
 
 function resizeCanvas() {
   const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.7);
   canvas.width = size;
   canvas.height = size;
-  grid = Math.floor(size / 25);
 }
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", () => { resizeCanvas(); updateControls(); });
 resizeCanvas();
 
-// Show correct controls based on orientation
-function updateOrientation() {
-  if(window.innerWidth > window.innerHeight) {
-    document.body.classList.add("landscape");
-    document.body.classList.remove("portrait");
+function isMobile() {
+  return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+}
+
+function updateControls() {
+  if (!isMobile()) {
+    portraitControls.style.display = 'none';
+    landscapeControls.style.display = 'none';
+    return;
+  }
+
+  if (window.innerWidth > window.innerHeight) {
+    // landscape mobile
+    portraitControls.style.display = 'none';
+    landscapeControls.style.display = 'flex';
   } else {
-    document.body.classList.add("portrait");
-    document.body.classList.remove("landscape");
+    // portrait mobile
+    portraitControls.style.display = 'flex';
+    landscapeControls.style.display = 'none';
   }
 }
-window.addEventListener("resize", updateOrientation);
-updateOrientation();
+window.addEventListener("resize", updateControls);
+window.addEventListener("orientationchange", updateControls);
+updateControls();
 
 function initGame() {
-  snake = { x: grid*5, y: grid*5, dx: grid, dy:0, cells:[], maxCells:4 };
+  snake = { x: grid*5, y: grid*5, dx: grid, dy: 0, cells: [], maxCells: 4 };
   scoreEl.textContent = 0;
   nextDirection = null;
   placeApple();
@@ -198,20 +203,19 @@ function initGame() {
 function getRandomInt(min,max){ return Math.floor(Math.random()*(max-min))+min; }
 
 function placeApple(){
-  let valid = false;
+  let valid=false;
   while(!valid){
-    apple = {
-      x: getRandomInt(0, Math.floor(canvas.width/grid))*grid,
-      y: getRandomInt(0, Math.floor(canvas.height/grid))*grid
-    };
-    valid = !snake.cells.some(c=>c.x===apple.x && c.y===apple.y);
+    apple={ x: getRandomInt(0,Math.floor(canvas.width/grid))*grid,
+            y: getRandomInt(0,Math.floor(canvas.height/grid))*grid };
+    valid=!snake.cells.some(c=>c.x===apple.x && c.y===apple.y);
   }
 }
 
 function loop(){
   if(!gameRunning) return;
-  animationId = requestAnimationFrame(loop);
-  if(++count < 5) return; count=0;
+  requestAnimationFrame(loop);
+  if(++count<5) return; count=0;
+
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   if(nextDirection){
@@ -222,13 +226,13 @@ function loop(){
     nextDirection=null;
   }
 
-  snake.x += snake.dx;
-  snake.y += snake.dy;
+  snake.x+=snake.dx;
+  snake.y+=snake.dy;
 
-  if(snake.x<0) snake.x = canvas.width - grid;
-  if(snake.x>=canvas.width) snake.x = 0;
-  if(snake.y<0) snake.y = canvas.height - grid;
-  if(snake.y>=canvas.height) snake.y = 0;
+  if(snake.x<0) snake.x=canvas.width-grid;
+  if(snake.x>=canvas.width) snake.x=0;
+  if(snake.y<0) snake.y=canvas.height-grid;
+  if(snake.y>=canvas.height) snake.y=0;
 
   snake.cells.unshift({x:snake.x, y:snake.y});
   if(snake.cells.length>snake.maxCells) snake.cells.pop();
@@ -254,12 +258,14 @@ function loop(){
 startBtn.onclick=()=>{if(!gameRunning){gameRunning=true; loop();}};
 pauseBtn.onclick=()=>gameRunning=false;
 resetBtn.onclick=()=>{gameRunning=false; initGame();};
+
 document.addEventListener("keydown", e=>{
   if(e.key==="ArrowUp") nextDirection="Up";
   if(e.key==="ArrowDown") nextDirection="Down";
   if(e.key==="ArrowLeft") nextDirection="Left";
   if(e.key==="ArrowRight") nextDirection="Right";
 });
+
 mobileBtns.forEach(btn=>{btn.onclick=()=>nextDirection=btn.dataset.dir;});
 
 initGame();
