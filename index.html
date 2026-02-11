@@ -1,3 +1,4 @@
+make it responsive for all devices and also the logic of game. so the apple should show and the snake should move inside the borders 
 <!DOCTYPE html>
 <html lang="en">
 
@@ -76,20 +77,14 @@
       color: #0b1020;
     }
 
-canvas {
-  background: radial-gradient(circle at center, #0f1a2b, #081020);
-  border: 3px solid #7efc6d;
-  border-radius: 15px;
-  display: block;
-  box-shadow: 0 0 20px rgba(126, 252, 109, 0.7);
-
-  /* fully responsive */
-  width: min(90vw, 90vh);
-  height: min(90vw, 90vh);
-  max-width: 600px;
-  max-height: 600px;
-}
-
+    canvas {
+      background: radial-gradient(circle at center, #0f1a2b, #081020);
+      border: 3px solid #7efc6d;
+      border-radius: 15px;
+      display: block;
+      margin-right: 15px;
+      box-shadow: 0 0 20px rgba(126, 252, 109, 0.7);
+    }
 
     .mobile-controls {
       display: none;
@@ -210,7 +205,7 @@ canvas {
     <button class="reset" id="resetBtn">Reset</button>
   </div>
 
-  <canvas id="game"></canvas>
+  <canvas id="game" width="400" height="400"></canvas>
 
   <div class="mobile-controls">
     <div class="row">
@@ -229,185 +224,236 @@ canvas {
     <button id="restartBtn">Play Again</button>
   </div>
 
-  <script>
-    const eatSound = new Audio('https://freesound.org/data/previews/66/66717_931655-lq.mp3');
-    const gameOverSound = new Audio('https://freesound.org/data/previews/341/341695_5260874-lq.mp3');
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const scoreElement = document.getElementById('score');
-    const startBtn = document.getElementById('startBtn');
-    const pauseBtn = document.getElementById('pauseBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const mobileButtons = document.querySelectorAll('.mobile-btn');
-    const gameOverPopup = document.getElementById('gameOverPopup');
-    const finalScoreElement = document.getElementById('finalScore');
+<script>
+const eatSound = new Audio('https://freesound.org/data/previews/66/66717_931655-lq.mp3');
+const gameOverSound = new Audio('https://freesound.org/data/previews/341/341695_5260874-lq.mp3');
 
-    let grid;
-    let boardSize;
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
 
-function updateGrid() {
-grid = Math.floor(boardSize / 25);
-}
+const scoreElement = document.getElementById('score');
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+const mobileButtons = document.querySelectorAll('.mobile-btn');
+const gameOverPopup = document.getElementById('gameOverPopup');
+const finalScoreElement = document.getElementById('finalScore');
 
-    let count = 0;
-    let snake, apple;
-    let gameRunning = false;
-    let nextDirection = null;
-    let gameLoopId = null;
+let grid = 20; // dynamic grid
+let count = 0;
+let snake, apple;
+let gameRunning = false;
+let nextDirection = null;
 
-    function initGame() {
-      snake = { x: 160, y: 160, dx: grid, dy: 0, cells: [], maxCells: 4 };
-      apple = {
-  x: getRandomInt(0, boardSize / grid) * grid,
-  y: getRandomInt(0, boardSize / grid) * grid
-};
+/* ---------------- RESPONSIVE CANVAS ---------------- */
 
-      scoreElement.textContent = 0;
-      nextDirection = null;
-      gameOverPopup.classList.remove('show');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-    }
-
-    // Make canvas responsive + sharp on all screens
 function resizeCanvas() {
-  const size = Math.min(window.innerWidth, window.innerHeight) * 0.85;
-  const dpr = window.devicePixelRatio || 1;
-
-  // visible size (game logic uses this)
-  boardSize = size;
+  let size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.7, 500);
 
   canvas.style.width = size + "px";
   canvas.style.height = size + "px";
-game uses boardSize = 400 (visible area)
-canvas pixels used only for sharp rendering
 
-  // real pixel size (for sharp rendering)
-  canvas.width = size * dpr;
-  canvas.height = size * dpr;
+  // internal resolution (important for logic)
+  canvas.width = size;
+  canvas.height = size;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  updateGrid();
+  grid = Math.floor(size / 20); // always 20 cells
 }
 
+window.addEventListener("resize", resizeCanvas);
 
-// run on load + resize
-window.addEventListener("resize", () => {
+/* ---------------- GAME INIT ---------------- */
+
+function initGame() {
   resizeCanvas();
-  initGame(); // restart game to fit new size
-});
 
-    function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min)) + min; }
+  snake = {
+    x: grid * 5,
+    y: grid * 5,
+    dx: grid,
+    dy: 0,
+    cells: [],
+    maxCells: 4
+  };
 
-    function loop() {
-      if (!gameRunning) return;
-      gameLoopId = requestAnimationFrame(loop);
+  apple = randomApple();
 
-      if (++count < 4) return;
-      count = 0;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+  scoreElement.textContent = 0;
+  nextDirection = null;
+  gameOverPopup.classList.remove('show');
 
-      // Apply next direction
-      if (nextDirection) {
-        switch (nextDirection) {
-          case 'Up': if (snake.dy === 0) { snake.dx = 0; snake.dy = -grid; } break;
-          case 'Down': if (snake.dy === 0) { snake.dx = 0; snake.dy = grid; } break;
-          case 'Left': if (snake.dx === 0) { snake.dx = -grid; snake.dy = 0; } break;
-          case 'Right': if (snake.dx === 0) { snake.dx = grid; snake.dy = 0; } break;
-        }
-        nextDirection = null;
-      }
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
 
-      snake.x += snake.dx;
-      snake.y += snake.dy;
+function randomApple() {
+  let pos;
 
-      if (snake.x < 0) snake.x = boardSize - grid;
-      if (snake.x >= boardSize) snake.x = 0;
-      if (snake.y < 0) snake.y = boardSize - grid;
-      if (snake.y >= boardSize) snake.y = 0;
+  do {
+    pos = {
+      x: getRandomInt(0, canvas.width / grid) * grid,
+      y: getRandomInt(0, canvas.height / grid) * grid
+    };
+  } while (snake && snake.cells.some(c => c.x === pos.x && c.y === pos.y));
 
+  return pos;
+}
 
-      snake.cells.unshift({ x: snake.x, y: snake.y });
-      if (snake.cells.length > snake.maxCells) snake.cells.pop();
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
 
-      // Draw apple
-      const appleGradient = ctx.createRadialGradient(apple.x + grid / 2, apple.y + grid / 2, 2, apple.x + grid / 2, apple.y + grid / 2, grid / 2);
-      appleGradient.addColorStop(0, '#ff8e8e');
-      appleGradient.addColorStop(1, '#ff6b6b');
-      ctx.fillStyle = appleGradient;
-      ctx.fillRect(apple.x, apple.y, grid - 1, grid - 1);
+/* ---------------- GAME LOOP ---------------- */
 
-      // Draw snake
-      snake.cells.forEach((cell, index) => {
-        const snakeGradient = ctx.createLinearGradient(cell.x, cell.y, cell.x + grid, cell.y + grid);
-        snakeGradient.addColorStop(0, '#7efc6d');
-        snakeGradient.addColorStop(1, '#4caf50');
-        ctx.fillStyle = snakeGradient;
-        ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
-      });
+function loop() {
+  if (!gameRunning) return;
 
-      // Check collisions & eating
-      let collision = false;
-      snake.cells.forEach((cell, index) => {
-  if (cell.x === apple.x && cell.y === apple.y) {
-    snake.maxCells++;
-    scoreElement.textContent = parseInt(scoreElement.textContent) + 1;
-    
-    // Animate score
-    scoreElement.style.transform = 'scale(1.3)';
-    setTimeout(() => scoreElement.style.transform = 'scale(1)', 100);
+  requestAnimationFrame(loop);
 
-    // Play eat sound
-    eatSound.currentTime = 0;
-    eatSound.play();
+  if (++count < 4) return;
+  count = 0;
 
-    apple.x = getRandomInt(0, boardSize / grid) * grid;
-    apple.y = getRandomInt(0, boardSize / grid) * grid;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  /* apply direction */
+  if (nextDirection) {
+    switch (nextDirection) {
+      case 'Up': if (snake.dy === 0) { snake.dx = 0; snake.dy = -grid; } break;
+      case 'Down': if (snake.dy === 0) { snake.dx = 0; snake.dy = grid; } break;
+      case 'Left': if (snake.dx === 0) { snake.dx = -grid; snake.dy = 0; } break;
+      case 'Right': if (snake.dx === 0) { snake.dx = grid; snake.dy = 0; } break;
+    }
+    nextDirection = null;
   }
-  for (let i = index + 1; i < snake.cells.length; i++) {
-    if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) collision = true;
-  }
-});
 
-      if (collision) gameOver();
+  snake.x += snake.dx;
+  snake.y += snake.dy;
+
+  /* ---------- WALL COLLISION (inside borders) ---------- */
+  if (
+    snake.x < 0 ||
+    snake.x >= canvas.width ||
+    snake.y < 0 ||
+    snake.y >= canvas.height
+  ) {
+    gameOver();
+    return;
+  }
+
+  snake.cells.unshift({ x: snake.x, y: snake.y });
+
+  if (snake.cells.length > snake.maxCells) {
+    snake.cells.pop();
+  }
+
+  /* ---------- DRAW APPLE ---------- */
+  const appleGradient = ctx.createRadialGradient(
+    apple.x + grid / 2,
+    apple.y + grid / 2,
+    2,
+    apple.x + grid / 2,
+    apple.y + grid / 2,
+    grid / 2
+  );
+
+  appleGradient.addColorStop(0, '#ff8e8e');
+  appleGradient.addColorStop(1, '#ff6b6b');
+
+  ctx.fillStyle = appleGradient;
+  ctx.fillRect(apple.x, apple.y, grid - 1, grid - 1);
+
+  /* ---------- DRAW SNAKE ---------- */
+  snake.cells.forEach((cell, index) => {
+
+    const snakeGradient = ctx.createLinearGradient(
+      cell.x, cell.y,
+      cell.x + grid, cell.y + grid
+    );
+
+    snakeGradient.addColorStop(0, '#7efc6d');
+    snakeGradient.addColorStop(1, '#4caf50');
+
+    ctx.fillStyle = snakeGradient;
+    ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+
+    /* apple eat */
+    if (cell.x === apple.x && cell.y === apple.y) {
+      snake.maxCells++;
+      scoreElement.textContent = +scoreElement.textContent + 1;
+
+      scoreElement.style.transform = 'scale(1.3)';
+      setTimeout(() => scoreElement.style.transform = 'scale(1)', 100);
+
+      eatSound.currentTime = 0;
+      eatSound.play();
+
+      apple = randomApple();
     }
 
-    function gameOver() {
-      gameRunning = false;
+    /* self collision */
+    for (let i = index + 1; i < snake.cells.length; i++) {
+      if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
+        gameOver();
+        return;
+      }
+    }
+  });
+}
+
+/* ---------------- GAME OVER ---------------- */
+
+function gameOver() {
+  gameRunning = false;
   finalScoreElement.textContent = scoreElement.textContent;
 
-  // Play game over sound
   gameOverSound.currentTime = 0;
   gameOverSound.play();
 
   gameOverPopup.classList.add('show');
-    }
+}
 
-    startBtn.addEventListener('click', () => { if (!gameRunning) { gameRunning = true; loop(); } });
-    pauseBtn.addEventListener('click', () => { gameRunning = false; });
-    resetBtn.addEventListener('click', initGame);
-    document.getElementById('restartBtn').addEventListener('click', () => { initGame(); gameRunning = true; loop(); });
+/* ---------------- CONTROLS ---------------- */
 
-    document.addEventListener('keydown', e => {
-      switch (e.which) {
-        case 37: if (snake.dx === 0) nextDirection = 'Left'; break;
-        case 38: if (snake.dy === 0) nextDirection = 'Up'; break;
-        case 39: if (snake.dx === 0) nextDirection = 'Right'; break;
-        case 40: if (snake.dy === 0) nextDirection = 'Down'; break;
-      }
-    });
+startBtn.addEventListener('click', () => {
+  if (!gameRunning) {
+    gameRunning = true;
+    loop();
+  }
+});
 
-    mobileButtons.forEach(btn => {
-      btn.addEventListener('click', () => { nextDirection = btn.getAttribute('data-direction'); });
-      btn.addEventListener('touchstart', e => { e.preventDefault(); nextDirection = btn.getAttribute('data-direction'); });
-    });
+pauseBtn.addEventListener('click', () => gameRunning = false);
 
-    resizeCanvas();
+resetBtn.addEventListener('click', initGame);
+
+document.getElementById('restartBtn').addEventListener('click', () => {
+  initGame();
+  gameRunning = true;
+  loop();
+});
+
+document.addEventListener('keydown', e => {
+  switch (e.which) {
+    case 37: if (snake.dx === 0) nextDirection = 'Left'; break;
+    case 38: if (snake.dy === 0) nextDirection = 'Up'; break;
+    case 39: if (snake.dx === 0) nextDirection = 'Right'; break;
+    case 40: if (snake.dy === 0) nextDirection = 'Down'; break;
+  }
+});
+
+mobileButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    nextDirection = btn.dataset.direction;
+  });
+
+  btn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    nextDirection = btn.dataset.direction;
+  });
+});
+
+/* start */
 initGame();
+</script>
 
-  </script>
 
 </body>
 
