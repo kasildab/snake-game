@@ -76,14 +76,20 @@
       color: #0b1020;
     }
 
-    canvas {
-      background: radial-gradient(circle at center, #0f1a2b, #081020);
-      border: 3px solid #7efc6d;
-      border-radius: 15px;
-      display: block;
-      margin-right: 15px;
-      box-shadow: 0 0 20px rgba(126, 252, 109, 0.7);
-    }
+canvas {
+  background: radial-gradient(circle at center, #0f1a2b, #081020);
+  border: 3px solid #7efc6d;
+  border-radius: 15px;
+  display: block;
+  box-shadow: 0 0 20px rgba(126, 252, 109, 0.7);
+
+  /* fully responsive */
+  width: min(90vw, 90vh);
+  height: min(90vw, 90vh);
+  max-width: 600px;
+  max-height: 600px;
+}
+
 
     .mobile-controls {
       display: none;
@@ -204,7 +210,7 @@
     <button class="reset" id="resetBtn">Reset</button>
   </div>
 
-  <canvas id="game" width="400" height="400"></canvas>
+  <canvas id="game"></canvas>
 
   <div class="mobile-controls">
     <div class="row">
@@ -236,7 +242,12 @@
     const gameOverPopup = document.getElementById('gameOverPopup');
     const finalScoreElement = document.getElementById('finalScore');
 
-    let grid = 16;
+    let grid;
+
+function updateGrid() {
+  grid = Math.floor(canvas.width / 25 / (window.devicePixelRatio || 1));
+}
+
     let count = 0;
     let snake, apple;
     let gameRunning = false;
@@ -250,7 +261,29 @@
       nextDirection = null;
       gameOverPopup.classList.remove('show');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
     }
+
+    // Make canvas responsive + sharp on all screens
+function resizeCanvas() {
+  const size = Math.min(window.innerWidth, window.innerHeight) * 0.85;
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.style.width = size + "px";
+  canvas.style.height = size + "px";
+
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    updateGrid();
+}
+
+// run on load + resize
+window.addEventListener("resize", () => {
+  resizeCanvas();
+  initGame(); // restart game to fit new size
+});
 
     function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min)) + min; }
 
@@ -356,7 +389,9 @@
       btn.addEventListener('touchstart', e => { e.preventDefault(); nextDirection = btn.getAttribute('data-direction'); });
     });
 
-    initGame();
+    resizeCanvas();
+initGame();
+
   </script>
 
 </body>
