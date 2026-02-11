@@ -229,7 +229,6 @@ const gameOverSound = new Audio('https://freesound.org/data/previews/341/341695_
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-
 const scoreElement = document.getElementById('score');
 const startBtn = document.getElementById('startBtn');
 const pauseBtn = document.getElementById('pauseBtn');
@@ -238,171 +237,136 @@ const mobileButtons = document.querySelectorAll('.mobile-btn');
 const gameOverPopup = document.getElementById('gameOverPopup');
 const finalScoreElement = document.getElementById('finalScore');
 
-let grid = 20; // dynamic grid
-let count = 0;
+let gridSize = 20;
+let tileCount;
 let snake, apple;
+let direction = { x: 1, y: 0 };
+let nextDirection = { x: 1, y: 0 };
 let gameRunning = false;
-let nextDirection = null;
+let score = 0;
+let speed = 120;
+let gameInterval;
 
-/* ---------------- RESPONSIVE CANVAS ---------------- */
-
+// ================= RESPONSIVE CANVAS =================
 function resizeCanvas() {
-  let size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.7, 500);
-
-  canvas.style.width = size + "px";
-  canvas.style.height = size + "px";
-
-  // internal resolution (important for logic)
+  const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.65);
   canvas.width = size;
   canvas.height = size;
 
-  grid = Math.floor(size / 20); // always 20 cells
+  tileCount = Math.floor(canvas.width / gridSize);
 }
 
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener('resize', resizeCanvas);
 
-/* ---------------- GAME INIT ---------------- */
-
+// ================= GAME INIT =================
 function initGame() {
   resizeCanvas();
 
-  snake = {
-    x: grid * 5,
-    y: grid * 5,
-    dx: grid,
-    dy: 0,
-    cells: [],
-    maxCells: 4
-  };
+  snake = [
+    { x: 5, y: 5 }
+  ];
 
-  apple = randomApple();
+  direction = { x: 1, y: 0 };
+  nextDirection = { x: 1, y: 0 };
+  score = 0;
+  speed = 120;
 
-  scoreElement.textContent = 0;
-  nextDirection = null;
+  scoreElement.textContent = score;
   gameOverPopup.classList.remove('show');
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  spawnApple();
+  drawGame();
 }
 
-function randomApple() {
-  let pos;
+// ================= APPLE SPAWN =================
+function spawnApple() {
+  let valid = false;
 
-  do {
-    pos = {
-      x: getRandomInt(0, canvas.width / grid) * grid,
-      y: getRandomInt(0, canvas.height / grid) * grid
+  while (!valid) {
+    apple = {
+      x: Math.floor(Math.random() * tileCount),
+      y: Math.floor(Math.random() * tileCount)
     };
-  } while (snake && snake.cells.some(c => c.x === pos.x && c.y === pos.y));
 
-  return pos;
+    valid = !snake.some(cell => cell.x === apple.x && cell.y === apple.y);
+  }
 }
 
-function getRandomInt(min, max) {
-  return Math.floor(Math.random() * (max - min)) + min;
+// ================= GAME LOOP =================
+function startGame() {
+  if (gameRunning) return;
+  gameRunning = true;
+  gameInterval = setInterval(updateGame, speed);
 }
 
-/* ---------------- GAME LOOP ---------------- */
+function pauseGame() {
+  gameRunning = false;
+  clearInterval(gameInterval);
+}
 
-function loop() {
-  if (!gameRunning) return;
+function updateGame() {
+  direction = nextDirection;
 
-  requestAnimationFrame(loop);
+  const head = {
+    x: snake[0].x + direction.x,
+    y: snake[0].y + direction.y
+  };
 
-  if (++count < 4) return;
-  count = 0;
+  // Wall collision
+  if (
+    head.x < 0 || head.y < 0 ||
+    head.x >= tileCount || head.y >= tileCount ||
+    snake.some(cell => cell.x === head.x && cell.y === head.y)
+  ) {
+    return gameOver();
+  }
 
+  snake.unshift(head);
+
+  // Eat apple
+  if (head.x === apple.x && head.y === apple.y) {
+    eatSound.currentTime = 0;
+    eatSound.play();
+
+    score++;
+    scoreElement.textContent = score;
+
+    // Increase speed gradually
+    if (speed > 60) {
+      speed -= 3;
+      clearInterval(gameInterval);
+      gameInterval = setInterval(updateGame, speed);
+    }
+
+    spawnApple();
+  } else {
+    snake.pop();
+  }
+
+  drawGame();
+}
+
+// ================= DRAW =================
+function drawGame() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  /* apply direction */
-  if (nextDirection) {
-    switch (nextDirection) {
-      case 'Up': if (snake.dy === 0) { snake.dx = 0; snake.dy = -grid; } break;
-      case 'Down': if (snake.dy === 0) { snake.dx = 0; snake.dy = grid; } break;
-      case 'Left': if (snake.dx === 0) { snake.dx = -grid; snake.dy = 0; } break;
-      case 'Right': if (snake.dx === 0) { snake.dx = grid; snake.dy = 0; } break;
-    }
-    nextDirection = null;
-  }
+  const tileSize = canvas.width / tileCount;
 
-  snake.x += snake.dx;
-  snake.y += snake.dy;
+  // Draw apple
+  ctx.fillStyle = "#ff4d4d";
+  ctx.fillRect(apple.x * tileSize, apple.y * tileSize, tileSize - 2, tileSize - 2);
 
-  /* ---------- WALL COLLISION (inside borders) ---------- */
-  if (
-    snake.x < 0 ||
-    snake.x >= canvas.width ||
-    snake.y < 0 ||
-    snake.y >= canvas.height
-  ) {
-    gameOver();
-    return;
-  }
-
-  snake.cells.unshift({ x: snake.x, y: snake.y });
-
-  if (snake.cells.length > snake.maxCells) {
-    snake.cells.pop();
-  }
-
-  /* ---------- DRAW APPLE ---------- */
-  const appleGradient = ctx.createRadialGradient(
-    apple.x + grid / 2,
-    apple.y + grid / 2,
-    2,
-    apple.x + grid / 2,
-    apple.y + grid / 2,
-    grid / 2
-  );
-
-  appleGradient.addColorStop(0, '#ff8e8e');
-  appleGradient.addColorStop(1, '#ff6b6b');
-
-  ctx.fillStyle = appleGradient;
-  ctx.fillRect(apple.x, apple.y, grid - 1, grid - 1);
-
-  /* ---------- DRAW SNAKE ---------- */
-  snake.cells.forEach((cell, index) => {
-
-    const snakeGradient = ctx.createLinearGradient(
-      cell.x, cell.y,
-      cell.x + grid, cell.y + grid
-    );
-
-    snakeGradient.addColorStop(0, '#7efc6d');
-    snakeGradient.addColorStop(1, '#4caf50');
-
-    ctx.fillStyle = snakeGradient;
-    ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
-
-    /* apple eat */
-    if (cell.x === apple.x && cell.y === apple.y) {
-      snake.maxCells++;
-      scoreElement.textContent = +scoreElement.textContent + 1;
-
-      scoreElement.style.transform = 'scale(1.3)';
-      setTimeout(() => scoreElement.style.transform = 'scale(1)', 100);
-
-      eatSound.currentTime = 0;
-      eatSound.play();
-
-      apple = randomApple();
-    }
-
-    /* self collision */
-    for (let i = index + 1; i < snake.cells.length; i++) {
-      if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
-        gameOver();
-        return;
-      }
-    }
+  // Draw snake
+  ctx.fillStyle = "#7efc6d";
+  snake.forEach((cell, index) => {
+    ctx.fillRect(cell.x * tileSize, cell.y * tileSize, tileSize - 2, tileSize - 2);
   });
 }
 
-/* ---------------- GAME OVER ---------------- */
-
+// ================= GAME OVER =================
 function gameOver() {
-  gameRunning = false;
-  finalScoreElement.textContent = scoreElement.textContent;
+  pauseGame();
+  finalScoreElement.textContent = score;
 
   gameOverSound.currentTime = 0;
   gameOverSound.play();
@@ -410,46 +374,42 @@ function gameOver() {
   gameOverPopup.classList.add('show');
 }
 
-/* ---------------- CONTROLS ---------------- */
-
-startBtn.addEventListener('click', () => {
-  if (!gameRunning) {
-    gameRunning = true;
-    loop();
-  }
-});
-
-pauseBtn.addEventListener('click', () => gameRunning = false);
-
-resetBtn.addEventListener('click', initGame);
-
-document.getElementById('restartBtn').addEventListener('click', () => {
-  initGame();
-  gameRunning = true;
-  loop();
-});
+// ================= CONTROLS =================
+function setDirection(x, y) {
+  // Prevent reverse direction
+  if (x === -direction.x && y === -direction.y) return;
+  nextDirection = { x, y };
+}
 
 document.addEventListener('keydown', e => {
-  switch (e.which) {
-    case 37: if (snake.dx === 0) nextDirection = 'Left'; break;
-    case 38: if (snake.dy === 0) nextDirection = 'Up'; break;
-    case 39: if (snake.dx === 0) nextDirection = 'Right'; break;
-    case 40: if (snake.dy === 0) nextDirection = 'Down'; break;
-  }
+  if (e.key === 'ArrowUp') setDirection(0, -1);
+  if (e.key === 'ArrowDown') setDirection(0, 1);
+  if (e.key === 'ArrowLeft') setDirection(-1, 0);
+  if (e.key === 'ArrowRight') setDirection(1, 0);
 });
 
 mobileButtons.forEach(btn => {
   btn.addEventListener('click', () => {
-    nextDirection = btn.dataset.direction;
-  });
-
-  btn.addEventListener('touchstart', e => {
-    e.preventDefault();
-    nextDirection = btn.dataset.direction;
+    const dir = btn.dataset.direction;
+    if (dir === 'Up') setDirection(0, -1);
+    if (dir === 'Down') setDirection(0, 1);
+    if (dir === 'Left') setDirection(-1, 0);
+    if (dir === 'Right') setDirection(1, 0);
   });
 });
 
-/* start */
+// ================= BUTTONS =================
+startBtn.addEventListener('click', startGame);
+pauseBtn.addEventListener('click', pauseGame);
+resetBtn.addEventListener('click', () => {
+  pauseGame();
+  initGame();
+});
+document.getElementById('restartBtn').addEventListener('click', () => {
+  initGame();
+  startGame();
+});
+
 initGame();
 </script>
 
